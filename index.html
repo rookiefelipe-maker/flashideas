@@ -1397,6 +1397,15 @@
       const fullText = formatText(note.text, note.links || []);
       previewBody.innerHTML = fullText;
       previewOverlay.classList.add('open');
+      
+      // Agregar listeners a los backlinks
+      previewBody.querySelectorAll('.backlink-chip[data-backlink]').forEach(chip => {
+        chip.style.cursor = 'pointer';
+        chip.addEventListener('click', () => {
+          const linkedNoteId = chip.dataset.backlink;
+          openNotePreview(linkedNoteId);
+        });
+      });
     }
 
     function closePreview() {

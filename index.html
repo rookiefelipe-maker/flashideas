@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="description" content="Captura ideas accionables. Actúa o las pierdes." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="FlashIdeas" />
+  <title>FlashIdeas</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:       #0a0a0a;
+      --s1:       #111111;
+      --s2:       #181818;
+      --s3:       #222222;
+      --border:   #2c2c2c;
+      --border2:  #3a3a3a;
+      --text:     #ffffff;
+      --text2:    #aaaaaa;
+      --text3:    #555555;
+      --success:  #3ddc84;
+      --warn:     #ffaa33;
+      --danger:   #ff4455;
+      --r:        14px;
+      --rsm:      8px;
+      --safe-b:   env(safe-area-inset-bottom, 0px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overscroll-behavior: none;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    .logo {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .logo em { font-style: italic; color: var(--text3); }
+
+    #count-badge {
+      font-size: 0.62rem;
+      color: var(--text3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── FEED ── */
+    #feed {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 1rem 1rem calc(72px + var(--safe-b) + 1rem);
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    #feed::-webkit-scrollbar { display: none; }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      min-height: 55vh;
+      color: var(--text3);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-align: center;
+      line-height: 1.8;
+    }
+    .empty-state .icon { font-size: 2.2rem; opacity: 0.25; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--s1);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 0.9rem 1rem 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      position: relative;
+      overflow: hidden;
+      animation: cardIn 0.22s ease both;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card.dying { border-color: var(--danger); }
+
+    .card.checked-out { animation: checkOut 0.4s ease forwards; }
+    @keyframes checkOut {
+      to { opacity: 0; transform: scale(0.95) translateY(-4px); max-height: 0; padding: 0; margin: 0; }
+    }
+
+    .card.expired-out { animation: expireOut 0.45s ease forwards; }
+    @keyframes expireOut {
+      to { opacity: 0; transform: scale(0.97); filter: blur(2px); max-height: 0; padding: 0; margin: 0; }
+    }
+
+    /* timer bar top */
+    .card-bar {
+      position: absolute;
+      top: 0; left: 0;
+      height: 2px;
+      border-radius: 0 2px 0 0;
+      transition: width 60s linear, background-color 1s;
+      background: var(--success);
+    }
+
+    /* top row */
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .card-tag {
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--s3);
+      color: var(--text3);
+      border: 1px solid var(--border2);
+    }
+
+    .card-time {
+      font-size: 0.6rem;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+    .card-time.warn { color: var(--warn); }
+    .card-time.crit { color: var(--danger); }
+
+    /* body */
+    .card-body {
+      font-size: 0.8rem;
+      color: var(--text2);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .backlink-chip {
+      display: inline-block;
+      background: var(--s3);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: 0.75rem;
+      color: var(--text);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .mentions-row {
+      font-size: 0.6rem;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .mentions-pill {
+      background: var(--s3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1rem 0.45rem;
+      color: var(--text2);
+    }
+
+    /* actions */
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding-top: 0.1rem;
+    }
+
+    .btn-check {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: var(--s3);
+      border: 1px solid var(--border2);
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      padding: 0.45rem 0.85rem;
+      border-radius: var(--rsm);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 36px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-check:active { background: var(--success); color: #000; border-color: var(--success); }
+
+    .spacer { flex: 1; }
+
+    .btn-icon {
+      width: 36px; height: 36px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:active { background: var(--s3); color: var(--text); }
+    .btn-icon.del:active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+    /* ── BOTTOM BAR ── */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--s1);
+      border-top: 1px solid var(--border);
+      padding: 0.7rem 1rem calc(0.7rem + var(--safe-b));
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+    .search-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-ico {
+      position: absolute;
+      left: 0.75rem;
+      color: var(--text3);
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    #search-input {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 0.62rem 0.75rem 0.62rem 2.1rem;
+      outline: none;
+      -webkit-appearance: none;
+      min-height: 42px;
+    }
+    #search-input::placeholder { color: var(--text3); }
+
+    #btn-new {
+      width: 42px; height: 42px;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: 50%;
+      font-size: 1.4rem;
+      font-weight: 300;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s;
+    }
+    #btn-new:active { transform: scale(0.92); }
+
+    /* ── MODAL (bottom sheet) ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 300;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+
+    .sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--s1);
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid var(--border2);
+      padding: 1.25rem 1.25rem calc(1.5rem + var(--safe-b));
+      display: flex; flex-direction: column; gap: 1rem;
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 301;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .overlay.open .sheet { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      align-self: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .sheet-title {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text3);
+    }
+
+    #note-input {
+      width: 100%;
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      padding: 0.85rem 1rem;
+      resize: none;
+      outline: none;
+      min-height: 110px;
+      -webkit-appearance: none;
+    }
+    #note-input::placeholder { color: var(--text3); }
+
+    /* Backlink suggest */
+    #bl-suggest {
+      background: var(--s2);
+      border: 1px solid var(--border2);
+      border-radius: var(--rsm);
+      display: none;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    #bl-suggest.open { display: block; }
+
+    .sug-item {
+      padding: 0.65rem 1rem;
+      font-size: 0.78rem;
+      color: var(--text2);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0.15rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sug-item:last-child { border-bottom: none; }
+    .sug-item.active, .sug-item:active { background: var(--s3); color: var(--text); }
+    .sug-item .si-tag { font-size: 0.58rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* Tags */
+    .tags-row {
+      display: flex; gap: 0.45rem; flex-wrap: wrap;
+    }
+
+    .tag-btn {
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      background: var(--s2);
+      color: var(--text3);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 32px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tag-btn.sel {
+      background: var(--s3);
+      border-color: var(--border2);
+      color: var(--text);
+    }
+
+    .sheet-footer {
+      display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem;
+    }
+
+    .btn-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      padding: 0.6rem 1.1rem;
+      border-radius: var(--rsm);
+      cursor: pointer;
+      min-height: 42px;
+    }
+
+    .btn-save {
+      background: var(--text);
+      border: none;
+      color: var(--bg);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.6rem 1.5rem;
+      border-radius: var(--rsm);
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      min-height: 42px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-save:disabled { opacity: 0.3; }
+
+    /* ── PANEL (backlinks detail) ── */
+    .panel-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 400;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .panel-overlay.open { opacity: 1; pointer-events: all; }
+
+    .panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 88vw; max-width: 340px;
+      background: var(--s1);
+      border-left: 1px solid var(--border2);
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.26s cubic-bezier(0.4,0,0.2,1);
+      z-index: 401;
+      overflow: hidden;
+    }
+    .panel-overlay.open .panel { transform: translateX(0); }
+
+    .panel-head {
+      padding: 1.1rem 1.1rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem;
+    }
+    .panel-info { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
+    .panel-label { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+    .panel-note-preview { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
+
+    .panel-close {
+      background: none; border: none; color: var(--text3);
+      font-size: 1rem; cursor: pointer; padding: 0.2rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .panel-body {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 1rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+
+    .panel-section {
+      font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text3); margin-bottom: 0.1rem;
+    }
+
+    .mini-card {
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      padding: 0.65rem 0.8rem;
+      display: flex; flex-direction: column; gap: 0.25rem;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mini-card:active { border-color: var(--border2); }
+    .mini-card .mc-tag { font-size: 0.58rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+    .mini-card .mc-text { font-size: 0.78rem; color: var(--text2); line-height: 1.45; }
+
+    .empty-panel {
+      font-size: 0.72rem; color: var(--text3); text-align: center; padding: 2rem 1rem;
+      line-height: 1.8;
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: calc(80px + var(--safe-b));
+      left: 50%; transform: translateX(-50%) translateY(12px);
+      background: var(--s3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-size: 0.72rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 99px;
+      white-space: nowrap;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Flash<em>Ideas</em></div>
+    <div id="count-badge">0 ideas</div>
+  </header>
+
+  <div id="feed"></div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <div class="search-wrap">
+      <span class="search-ico">⌕</span>
+      <input id="search-input" type="search" placeholder="Buscar ideas..." autocomplete="off" autocorrect="off" />
+    </div>
+    <button id="btn-new" aria-label="Nueva idea">+</button>
+  </div>
+
+  <!-- Modal overlay (create / edit) -->
+  <div class="overlay" id="modal-overlay">
+    <div class="sheet" id="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="modal-title">Nueva idea</div>
+
+      <div style="position:relative">
+        <textarea id="note-input" placeholder="¿Qué idea tienes? Usa [[ para enlazar otras notas…" rows="4"></textarea>
+        <div id="bl-suggest"></div>
+      </div>
+
+      <div class="tags-row" id="tags-row"></div>
+
+      <div class="sheet-footer">
+        <button class="btn-cancel" id="btn-cancel">Cancelar</button>
+        <button class="btn-save" id="btn-save" disabled>Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel overlay (backlinks) -->
+  <div class="panel-overlay" id="panel-overlay">
+    <div class="panel" id="panel">
+      <div class="panel-head">
+        <div class="panel-info">
+          <div class="panel-label">Nota</div>
+          <div class="panel-note-preview" id="panel-note-preview"></div>
+        </div>
+        <button class="panel-close" id="panel-close">✕</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ══════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════
+    const TAGS = ['Idea', 'Proyecto', 'Personal', 'Trabajo', 'Otro'];
+    const TTL  = 24 * 60 * 60 * 1000; // 24h ms
+
+    let notes        = [];
+    let editingId    = null;
+    let selectedTag  = TAGS[0];
+    let blQuery      = '';       // current [[query
+    let blStart      = -1;       // index where [[ started in textarea
+    let searchQuery  = '';
+    let panelNoteId  = null;
+
+    // ── Load from localStorage ──
+    function loadNotes() {
+      try { notes = JSON.parse(localStorage.getItem('fi_notes') || '[]'); }
+      catch { notes = []; }
+    }
+
+    function saveNotes() {
+      localStorage.setItem('fi_notes', JSON.stringify(notes));
+    }
+
+    function purgeExpired() {
+      const now = Date.now();
+      const before = notes.length;
+      notes = notes.filter(n => (now - n.createdAt) < TTL);
+      if (notes.length !== before) saveNotes();
+    }
+
+    // ══════════════════════════════════════════
+    //  RENDER FEED
+    // ══════════════════════════════════════════
+    const feed       = document.getElementById('feed');
+    const countBadge = document.getElementById('count-badge');
+
+    function renderFeed() {
+      purgeExpired();
+      const q = searchQuery.trim().toLowerCase();
+      let visible = [...notes].sort((a, b) => b.createdAt - a.createdAt);
+      if (q) visible = visible.filter(n =>
+        n.text.toLowerCase().includes(q) || n.tag.toLowerCase().includes(q)
+      );
+
+      countBadge.textContent = notes.length === 1 ? '1 idea' : `${notes.length} ideas`;
+
+      if (visible.length === 0) {
+        feed.innerHTML = `<div class="empty-state">
+          <div class="icon">⚡</div>
+          <div>${q ? 'Sin resultados para "' + q + '"' : 'Sin ideas aún.<br>Toca + para capturar una.'}</div>
+        </div>`;
+        return;
+      }
+
+      feed.innerHTML = '';
+      visible.forEach(note => {
+        feed.appendChild(buildCard(note));
+      });
+    }
+
+    function buildCard(note) {
+      const el   = document.createElement('div');
+      el.className = 'card';
+      el.dataset.id = note.id;
+
+      const now     = Date.now();
+      const elapsed = now - note.createdAt;
+      const pct     = Math.max(0, 100 - (elapsed / TTL) * 100);
+      const msLeft  = Math.max(0, TTL - elapsed);
+
+      const dying   = pct < 15;
+      if (dying) el.classList.add('dying');
+
+      // timer bar color
+      const barColor = pct > 50 ? 'var(--success)' : pct > 20 ? 'var(--warn)' : 'var(--danger)';
+
+      // mentions count (how many notes link to this one)
+      const mentionsCount = notes.filter(n =>
+        n.id !== note.id && (n.links || []).includes(note.id)
+      ).length;
+
+      // format text: render [[id]] as chips
+      const bodyHtml = formatText(note.text, note.links || []);
+
+      el.innerHTML = `
+        <div class="card-bar" style="width:${pct}%;background:${barColor}"></div>
+        <div class="card-top">
+          <span class="card-tag">${note.tag}</span>
+          <span class="card-time ${dying ? 'crit' : msLeft < 6 * 3600000 ? 'warn' : ''}" data-id="${note.id}">${formatTime(msLeft)}</span>
+        </div>
+        <div class="card-body">${bodyHtml}</div>
+        ${mentionsCount > 0 ? `<div class="mentions-row">🔗 <span class="mentions-pill">${mentionsCount} mención${mentionsCount > 1 ? 'es' : ''}</span></div>` : ''}
+        <div class="card-actions">
+          <button class="btn-check" data-action="check" data-id="${note.id}">✓ Trabajé en esto</button>
+          <div class="spacer"></div>
+          <button class="btn-icon" data-action="edit" data-id="${note.id}" title="Editar">✎</button>
+          <button class="btn-icon" data-action="export" data-id="${note.id}" title="Exportar .md">↓</button>
+          <button class="btn-icon del" data-action="delete" data-id="${note.id}" title="Borrar">✕</button>
+        </div>
+      `;
+      return el;
+    }
+
+    function formatTime(ms) {
+      if (ms <= 0) return 'Expirada';
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    function formatText(text, links) {
+      // Replace [[noteId:title]] with chips
+      const escaped = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return escaped.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
+        const [id, ...rest] = inner.split(':');
+        const title = rest.join(':') || id;
+        return `<span class="backlink-chip" data-backlink="${id}">[[${title}]]</span>`;
+      });
+    }
+
+    // ── Delegate card actions ──
+    feed.addEventListener('click', e => {
+      const action = e.target.closest('[data-action]');
+      if (action) {
+        const id = action.dataset.id;
+        const act = action.dataset.action;
+        if (act === 'check')  doCheck(id);
+        if (act === 'edit')   openEdit(id);
+        if (act === 'export') doExport(id);
+        if (act === 'delete') doDelete(id);
+        return;
+      }
+      const chip = e.target.closest('.backlink-chip');
+      if (chip) openPanel(chip.dataset.backlink);
+    });
+
+    function doCheck(id) {
+      const card = feed.querySelector(`.card[data-id="${id}"]`);
+      if (card) {
+        card.classList.add('checked-out');
+        setTimeout(() => {
+          notes = notes.filter(n => n.id !== id);
+          saveNotes();
+          renderFeed();
+        }, 420);
+      }
+      toast('✓ Idea accionada');
+    }
+
+    function doDelete(id) {
+      const card = feed.querySelector(`.card[data-id="${id}"]`);
+      if (card) {
+        card.classList.add('expired-out');
+        setTimeout(() => {
+          notes = notes.filter(n => n.id !== id);
+          saveNotes();
+          renderFeed();
+        }, 480);
+      }
+    }
+
+    function doExport(id) {
+      const note = notes.find(n => n.id === id);
+      if (!note) return;
+      const date = new Date(note.createdAt).toISOString().slice(0, 10);
+      const md = `# Idea — ${note.tag}\n> ${date}\n\n${note.text}\n`;
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `idea-${date}-${note.id.slice(-4)}.md`;
+      a.click();
+      toast('Exportado .md');
+    }
+
+    // ══════════════════════════════════════════
+    //  MODAL — create / edit
+    // ══════════════════════════════════════════
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalTitle   = document.getElementById('modal-title');
+    const noteInput    = document.getElementById('note-input');
+    const btnSave      = document.getElementById('btn-save');
+    const btnCancel    = document.getElementById('btn-cancel');
+    const btnNew       = document.getElementById('btn-new');
+    const blSuggest    = document.getElementById('bl-suggest');
+    const tagsRow      = document.getElementById('tags-row');
+
+    function buildTagsRow() {
+      tagsRow.innerHTML = '';
+      TAGS.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'tag-btn' + (t === selectedTag ? ' sel' : '');
+        btn.textContent = t;
+        btn.addEventListener('click', () => {
+          selectedTag = t;
+          buildTagsRow();
+        });
+        tagsRow.appendChild(btn);
+      });
+    }
+
+    function openModal() {
+      editingId = null;
+      noteInput.value = '';
+      selectedTag = TAGS[0];
+      buildTagsRow();
+      btnSave.disabled = true;
+      modalTitle.textContent = 'Nueva idea';
+      modalOverlay.classList.add('open');
+      setTimeout(() => noteInput.focus(), 300);
+    }
+
+    function openEdit(id) {
+      const note = notes.find(n => n.id === id);
+      if (!note) return;
+      editingId  = id;
+      noteInput.value = note.rawText || note.text;
+      selectedTag = note.tag;
+      buildTagsRow();
+      btnSave.disabled = false;
+      modalTitle.textContent = 'Editar idea';
+      modalOverlay.classList.add('open');
+      setTimeout(() => noteInput.focus(), 300);
+    }
+
+    function closeModal() {
+      modalOverlay.classList.remove('open');
+      blSuggest.classList.remove('open');
+      blSuggest.innerHTML = '';
+      blStart = -1;
+      blQuery = '';
+    }
+
+    btnNew.addEventListener('click', openModal);
+    btnCancel.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', e => {
+      if (e.target === modalOverlay) closeModal();
+    });
+
+    // Open modal on first load
+    window.addEventListener('load', () => {
+      loadNotes();
+      renderFeed();
+      openModal();
+    });
+
+    // ── Textarea input: backlink detect ──
+    noteInput.addEventListener('input', () => {
+      btnSave.disabled = noteInput.value.trim().length === 0;
+      detectBacklink();
+    });
+
+    noteInput.addEventListener('keydown', e => {
+      if (!blSuggest.classList.contains('open')) return;
+      const items = blSuggest.querySelectorAll('.sug-item');
+      const active = blSuggest.querySelector('.sug-item.active');
+      let idx = Array.from(items).indexOf(active);
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        idx = (idx + 1) % items.length;
+        items.forEach((it, i) => it.classList.toggle('active', i === idx));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        idx = (idx - 1 + items.length) % items.length;
+        items.forEach((it, i) => it.classList.toggle('active', i === idx));
+      } else if (e.key === 'Enter' && active) {
+        e.preventDefault();
+        insertBacklink(active.dataset.id, active.dataset.title);
+      } else if (e.key === 'Escape') {
+        blSuggest.classList.remove('open');
+      }
+    });
+
+    function detectBacklink() {
+      const val = noteInput.value;
+      const pos = noteInput.selectionStart;
+      // Find last [[ before cursor
+      const before = val.slice(0, pos);
+      const idx = before.lastIndexOf('[[');
+      if (idx === -1) { blSuggest.classList.remove('open'); return; }
+
+      // Check no ]] between [[ and cursor
+      const between = before.slice(idx + 2);
+      if (between.includes(']]') || between.includes('\n')) {
+        blSuggest.classList.remove('open'); return;
+      }
+
+      blStart = idx;
+      blQuery = between.toLowerCase();
+      showSuggestions(blQuery);
+    }
+
+    function showSuggestions(q) {
+      const matches = notes.filter(n =>
+        n.id !== editingId &&
+        (n.text.toLowerCase().includes(q) || n.tag.toLowerCase().includes(q))
+      ).slice(0, 6);
+
+      if (matches.length === 0) { blSuggest.classList.remove('open'); return; }
+
+      blSuggest.innerHTML = '';
+      matches.forEach((n, i) => {
+        const item = document.createElement('div');
+        item.className = 'sug-item' + (i === 0 ? ' active' : '');
+        item.dataset.id    = n.id;
+        item.dataset.title = n.text.slice(0, 40);
+        item.innerHTML = `
+          <span class="si-tag">${n.tag}</span>
+          <span>${n.text.slice(0, 50)}${n.text.length > 50 ? '…' : ''}</span>
+        `;
+        item.addEventListener('click', () => insertBacklink(n.id, n.text.slice(0, 40)));
+        blSuggest.appendChild(item);
+      });
+      blSuggest.classList.add('open');
+    }
+
+    function insertBacklink(id, title) {
+      const val   = noteInput.value;
+      const pos   = noteInput.selectionStart;
+      const token = `[[${id}:${title}]]`;
+      noteInput.value = val.slice(0, blStart) + token + val.slice(pos);
+      const newPos = blStart + token.length;
+      noteInput.setSelectionRange(newPos, newPos);
+      blSuggest.classList.remove('open');
+      blStart = -1; blQuery = '';
+      btnSave.disabled = noteInput.value.trim().length === 0;
+    }
+
+    // ── Save ──
+    btnSave.addEventListener('click', () => {
+      const raw  = noteInput.value.trim();
+      if (!raw) return;
+
+      // Extract linked IDs
+      const links = [];
+      const re = /\[\[([^\]:]+):[^\]]*\]\]/g;
+      let m;
+      while ((m = re.exec(raw)) !== null) links.push(m[1]);
+
+      if (editingId) {
+        const note = notes.find(n => n.id === editingId);
+        if (note) {
+          note.rawText = raw;
+          note.text    = raw;
+          note.tag     = selectedTag;
+          note.links   = links;
+        }
+        toast('Idea actualizada');
+      } else {
+        notes.unshift({
+          id:        crypto.randomUUID(),
+          text:      raw,
+          rawText:   raw,
+          tag:       selectedTag,
+          createdAt: Date.now(),
+          links
+        });
+        toast('¡Idea guardada! 24h para accionarla');
+      }
+
+      saveNotes();
+      closeModal();
+      renderFeed();
+    });
+
+    // ══════════════════════════════════════════
+    //  PANEL — backlinks
+    // ══════════════════════════════════════════
+    const panelOverlay     = document.getElementById('panel-overlay');
+    const panelClose       = document.getElementById('panel-close');
+    const panelNotePreview = document.getElementById('panel-note-preview');
+    const panelBody        = document.getElementById('panel-body');
+
+    function openPanel(noteId) {
+      const note = notes.find(n => n.id === noteId);
+      if (!note) return;
+      panelNoteId = noteId;
+
+      panelNotePreview.textContent = note.text.slice(0, 80) + (note.text.length > 80 ? '…' : '');
+
+      // Notes that link TO this note
+      const linksTo = notes.filter(n => n.id !== noteId && (n.links || []).includes(noteId));
+      // Notes this note links TO
+      const linksFrom = (note.links || []).map(id => notes.find(n => n.id === id)).filter(Boolean);
+
+      panelBody.innerHTML = '';
+
+      if (linksTo.length === 0 && linksFrom.length === 0) {
+        panelBody.innerHTML = `<div class="empty-panel">Esta nota no tiene<br>conexiones aún.</div>`;
+      } else {
+        if (linksTo.length > 0) {
+          const sec = document.createElement('div');
+          sec.className = 'panel-section';
+          sec.textContent = `${linksTo.length} nota${linksTo.length > 1 ? 's' : ''} mencionan esta idea`;
+          panelBody.appendChild(sec);
+          linksTo.forEach(n => panelBody.appendChild(buildMiniCard(n)));
+        }
+        if (linksFrom.length > 0) {
+          const sec = document.createElement('div');
+          sec.className = 'panel-section';
+          sec.style.marginTop = linksTo.length ? '0.75rem' : '0';
+          sec.textContent = 'Esta idea menciona';
+          panelBody.appendChild(sec);
+          linksFrom.forEach(n => panelBody.appendChild(buildMiniCard(n)));
+        }
+      }
+
+      panelOverlay.classList.add('open');
+    }
+
+    function buildMiniCard(note) {
+      const el = document.createElement('div');
+      el.className = 'mini-card';
+      el.innerHTML = `
+        <div class="mc-tag">${note.tag}</div>
+        <div class="mc-text">${note.text.slice(0, 60)}${note.text.length > 60 ? '…' : ''}</div>
+      `;
+      el.addEventListener('click', () => {
+        closePanel();
+        setTimeout(() => {
+          const card = feed.querySelector(`.card[data-id="${note.id}"]`);
+          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      });
+      return el;
+    }
+
+    function closePanel() { panelOverlay.classList.remove('open'); }
+    panelClose.addEventListener('click', closePanel);
+    panelOverlay.addEventListener('click', e => {
+      if (e.target === panelOverlay) closePanel();
+    });
+
+    // ══════════════════════════════════════════
+    //  SEARCH
+    // ══════════════════════════════════════════
+    document.getElementById('search-input').addEventListener('input', e => {
+      searchQuery = e.target.value;
+      renderFeed();
+    });
+
+    // ══════════════════════════════════════════
+    //  TIMER — update every minute
+    // ══════════════════════════════════════════
+    setInterval(() => {
+      purgeExpired();
+      // Update time labels without full re-render
+      document.querySelectorAll('.card-time[data-id]').forEach(el => {
+        const note = notes.find(n => n.id === el.dataset.id);
+        if (!note) return;
+        const msLeft = Math.max(0, TTL - (Date.now() - note.createdAt));
+        const pct    = Math.max(0, 100 - ((Date.now() - note.createdAt) / TTL) * 100);
+        el.textContent = formatTime(msLeft);
+        el.className = 'card-time' + (pct < 15 ? ' crit' : msLeft < 6 * 3600000 ? ' warn' : '');
+        // Update bar
+        const bar = el.closest('.card')?.querySelector('.card-bar');
+        if (bar) {
+          bar.style.width = pct + '%';
+          bar.style.backgroundColor = pct > 50 ? 'var(--success)' : pct > 20 ? 'var(--warn)' : 'var(--danger)';
+        }
+        // Mark dying cards
+        if (pct < 15) el.closest('.card')?.classList.add('dying');
+      });
+      // Refresh count
+      countBadge.textContent = notes.length === 1 ? '1 idea' : `${notes.length} ideas`;
+    }, 60000);
+
+    // ══════════════════════════════════════════
+    //  TOAST
+    // ══════════════════════════════════════════
+    let toastTimer;
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    // ══════════════════════════════════════════
+    //  SERVICE WORKER
+    // ══════════════════════════════════════════
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

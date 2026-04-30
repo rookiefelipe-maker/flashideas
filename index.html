@@ -873,10 +873,18 @@
 
     function formatText(text, links) {
       const escaped = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // Manejar ambos formatos: [[id:title]] y [[title]]
       return escaped.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
-        const [id, ...rest] = inner.split(':');
-        const title = rest.join(':') || id;
-        return `<span class="backlink-chip" data-backlink="${id}">[[${title}]]</span>`;
+        const parts = inner.split(':');
+        const idOrText = parts[0].trim();
+        const title = parts.length > 1 ? parts.slice(1).join(':') : idOrText;
+        
+        // Buscar si es un ID válido
+        const isValidId = notes.some(n => n.id === idOrText);
+        const displayText = isValidId ? title : idOrText;
+        const dataBacklink = isValidId ? idOrText : '';
+        
+        return `<span class="backlink-chip" ${dataBacklink ? `data-backlink="${dataBacklink}"` : 'style="opacity:0.6"'}>[[${displayText}]]</span>`;
       });
     }
 
@@ -969,15 +977,19 @@
         const el = document.createElement('div');
         el.className = 'archive-card';
         const date = new Date(note.archivedAt || note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const textContent = note.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
+          const parts = inner.split(':');
+          const title = parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+          return `<span style="opacity:0.6">[[${title}]]</span>`;
+        });
+        
         el.innerHTML = `
           <div class="archive-card-top">
             <span class="archive-card-tag">${note.tag}</span>
             <span class="archive-card-date">${date}</span>
           </div>
-          <div class="archive-card-body">${note.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
-            const title = inner.split(':').slice(1).join(':') || inner;
-            return `<span style="opacity:0.6">[[${title}]]</span>`;
-          })}</div>
+          <div class="archive-card-body">${textContent}</div>
           <div class="archive-card-footer">
             <button class="btn-icon" data-arch-export="${note.id}" title="Export .md">↓</button>
             <button class="btn-icon del" data-arch-delete="${note.id}" title="Delete permanently">✕</button>
@@ -1194,15 +1206,45 @@
     }
 
     // ── Save ──
+    function extractLinks(text) {
+      const links = [];
+      // Detectar formato completo [[id:title]] y simple [[title]]
+      const reComplete = /\[\[([^\]:]+):[^\]]*\]\]/g;
+      const reSimple = /\[\[([^\]:\[]+)\]\]/g;
+      
+      let m;
+      while ((m = reComplete.exec(text)) !== null) {
+        links.push(m[1]);
+      }
+      
+      // Buscar backlinks simples y tratar de encontrar el ID
+      let cleanText = text;
+      const simpleMatches = [...text.matchAll(reSimple)];
+      simpleMatches.forEach(match => {
+        const searchText = match[1].trim();
+        const foundNote = notes.find(n => 
+          n.id !== editingId && (
+            n.text.toLowerCase().includes(searchText.toLowerCase()) || 
+            n.tag.toLowerCase() === searchText.toLowerCase()
+          )
+        );
+        if (foundNote && !links.includes(foundNote.id)) {
+          links.push(foundNote.id);
+          // Reemplazar el formato simple con el completo
+          cleanText = cleanText.replace(`[[${searchText}]]`, `[[${foundNote.id}:${foundNote.text.slice(0, 40)}]]`);
+        }
+      });
+      
+      return { links, cleanText };
+    }
+
     btnSave.addEventListener('click', () => {
-      const raw  = noteInput.value.trim();
+      let raw  = noteInput.value.trim();
       const tag  = selectedTag || tagInput.value.trim();
       if (!raw || !tag) return;
 
-      const links = [];
-      const re = /\[\[([^\]:]+):[^\]]*\]\]/g;
-      let m;
-      while ((m = re.exec(raw)) !== null) links.push(m[1]);
+      const { links, cleanText } = extractLinks(raw);
+      raw = cleanText;
 
       addRecentTag(tag);
 

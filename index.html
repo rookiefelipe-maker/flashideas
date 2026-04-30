@@ -729,6 +729,20 @@
     </div>
   </div>
 
+  <!-- Note preview modal -->
+  <div class="overlay" id="preview-overlay">
+    <div class="sheet" id="preview-sheet" style="max-height: 85vh;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Note Preview</div>
+      <div id="preview-body" style="flex: 1; overflow-y: auto; font-size: 0.9rem; line-height: 1.6; color: var(--text2);"></div>
+      <div class="sheet-footer">
+        <button class="btn-cancel" id="preview-close">Close</button>
+        <button class="btn-icon" id="preview-edit" title="Edit">✎</button>
+        <button class="btn-icon del" id="preview-delete" title="Delete">✕</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script>
@@ -842,7 +856,8 @@
         n.id !== note.id && (n.links || []).includes(note.id)
       ).length;
 
-      const bodyHtml = formatText(note.text, note.links || []);
+      const preview = note.text.slice(0, 20) + (note.text.length > 20 ? '…' : '');
+      const bodyHtml = formatText(preview, note.links || []);
 
       el.innerHTML = `
         <div class="card-bar" style="width:${pct}%;background:${barColor}"></div>
@@ -850,7 +865,7 @@
           <span class="card-tag">${note.tag}</span>
           <span class="card-time ${dying ? 'crit' : msLeft < 6 * 3600000 ? 'warn' : ''}" data-id="${note.id}">${formatTime(msLeft)}</span>
         </div>
-        <div class="card-body">${bodyHtml}</div>
+        <div class="card-body" style="cursor: pointer;" data-preview-id="${note.id}">${bodyHtml}</div>
         ${mentionsCount > 0 ? `<div class="mentions-row">🔗 <span class="mentions-pill">${mentionsCount} mention${mentionsCount > 1 ? 's' : ''}</span></div>` : ''}
         <div class="card-actions">
           <button class="btn-check" data-action="check" data-id="${note.id}">✓ Worked on this</button>
@@ -890,6 +905,11 @@
 
     // ── Delegate card actions ──
     feed.addEventListener('click', e => {
+      const preview = e.target.closest('[data-preview-id]');
+      if (preview) {
+        openNotePreview(preview.dataset.previewId);
+        return;
+      }
       const action = e.target.closest('[data-action]');
       if (action) {
         const id  = action.dataset.id;
@@ -1135,8 +1155,7 @@
 
     function updateSaveButton() {
       const hasText = noteInput.value.trim().length > 0;
-      const hasTag = selectedTag || tagInput.value.trim();
-      btnSave.disabled = !(hasText && hasTag);
+      btnSave.disabled = !hasText;
     }
 
     noteInput.addEventListener('keydown', e => {
@@ -1209,7 +1228,7 @@
       noteInput.setSelectionRange(newPos, newPos);
       blSuggest.classList.remove('open');
       blStart = -1; blQuery = '';
-      btnSave.disabled = noteInput.value.trim().length === 0;
+      updateSaveButton();
     }
 
     // ── Save ──
@@ -1257,8 +1276,8 @@
 
     btnSave.addEventListener('click', () => {
       let raw  = noteInput.value.trim();
-      const tag  = selectedTag || tagInput.value.trim();
-      if (!raw || !tag) return;
+      const tag  = selectedTag || tagInput.value.trim() || 'Untagged';
+      if (!raw) return;
 
       const { links, cleanText } = extractLinks(raw);
       raw = cleanText;
@@ -1358,6 +1377,48 @@
     panelClose.addEventListener('click', closePanel);
     panelOverlay.addEventListener('click', e => {
       if (e.target === panelOverlay) closePanel();
+    });
+
+    // ══════════════════════════════════════════
+    //  NOTE PREVIEW
+    // ══════════════════════════════════════════
+    const previewOverlay = document.getElementById('preview-overlay');
+    const previewBody    = document.getElementById('preview-body');
+    const previewClose   = document.getElementById('preview-close');
+    const previewEdit    = document.getElementById('preview-edit');
+    const previewDelete  = document.getElementById('preview-delete');
+    let previewNoteId    = null;
+
+    function openNotePreview(noteId) {
+      const note = notes.find(n => n.id === noteId);
+      if (!note) return;
+      previewNoteId = noteId;
+
+      const fullText = formatText(note.text, note.links || []);
+      previewBody.innerHTML = fullText;
+      previewOverlay.classList.add('open');
+    }
+
+    function closePreview() {
+      previewOverlay.classList.remove('open');
+      previewNoteId = null;
+    }
+
+    previewClose.addEventListener('click', closePreview);
+    previewEdit.addEventListener('click', () => {
+      if (previewNoteId) {
+        closePreview();
+        setTimeout(() => openEdit(previewNoteId), 300);
+      }
+    });
+    previewDelete.addEventListener('click', () => {
+      if (previewNoteId) {
+        closePreview();
+        setTimeout(() => doDelete(previewNoteId), 300);
+      }
+    });
+    previewOverlay.addEventListener('click', e => {
+      if (e.target === previewOverlay) closePreview();
     });
 
     // ══════════════════════════════════════════

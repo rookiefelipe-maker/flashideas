@@ -677,7 +677,22 @@
         <div id="bl-suggest"></div>
       </div>
 
-      <div class="tags-row" id="tags-row"></div>
+      <div style="display:flex; flex-direction:column; gap:0.6rem;">
+        <input type="text" id="tag-input" placeholder="Add a tag..." style="
+          width: 100%;
+          background: var(--s2);
+          border: 1px solid var(--border);
+          border-radius: var(--rsm);
+          color: var(--text);
+          font-family: var(--font);
+          font-size: 0.82rem;
+          padding: 0.62rem 0.75rem;
+          outline: none;
+          -webkit-appearance: none;
+          min-height: 42px;
+        " />
+        <div class="tags-row" id="tags-row"></div>
+      </div>
 
       <div class="sheet-footer">
         <button class="btn-cancel" id="btn-cancel">Cancel</button>
@@ -720,13 +735,14 @@
     // ══════════════════════════════════════════
     //  STATE
     // ══════════════════════════════════════════
-    const TAGS = ['Idea', 'Project', 'Personal', 'Work', 'Other'];
     const TTL  = 24 * 60 * 60 * 1000; // 24h ms
+    const MAX_RECENT_TAGS = 10;
 
     let notes        = [];
     let archived     = [];
     let editingId    = null;
-    let selectedTag  = TAGS[0];
+    let selectedTag  = '';
+    let recentTags   = [];
     let blQuery      = '';
     let blStart      = -1;
     let searchQuery  = '';
@@ -736,6 +752,7 @@
     function loadNotes() {
       try { notes    = JSON.parse(localStorage.getItem('fi_notes')    || '[]'); } catch { notes = []; }
       try { archived = JSON.parse(localStorage.getItem('fi_archived') || '[]'); } catch { archived = []; }
+      try { recentTags = JSON.parse(localStorage.getItem('fi_recent_tags') || '[]'); } catch { recentTags = []; }
     }
 
     function saveNotes() {
@@ -744,6 +761,18 @@
 
     function saveArchived() {
       localStorage.setItem('fi_archived', JSON.stringify(archived));
+    }
+
+    function saveRecentTags() {
+      localStorage.setItem('fi_recent_tags', JSON.stringify(recentTags));
+    }
+
+    function addRecentTag(tag) {
+      if (!tag.trim()) return;
+      recentTags = recentTags.filter(t => t !== tag);
+      recentTags.unshift(tag);
+      recentTags = recentTags.slice(0, MAX_RECENT_TAGS);
+      saveRecentTags();
     }
 
     function purgeExpired() {
@@ -1001,25 +1030,30 @@
     const btnNew       = document.getElementById('btn-new');
     const blSuggest    = document.getElementById('bl-suggest');
     const tagsRow      = document.getElementById('tags-row');
+    const tagInput     = document.getElementById('tag-input');
 
     function buildTagsRow() {
       tagsRow.innerHTML = '';
-      TAGS.forEach(t => {
-        const btn = document.createElement('button');
-        btn.className = 'tag-btn' + (t === selectedTag ? ' sel' : '');
-        btn.textContent = t;
-        btn.addEventListener('click', () => {
-          selectedTag = t;
-          buildTagsRow();
+      if (recentTags.length > 0) {
+        recentTags.forEach(t => {
+          const btn = document.createElement('button');
+          btn.className = 'tag-btn' + (t === selectedTag ? ' sel' : '');
+          btn.textContent = t;
+          btn.addEventListener('click', () => {
+            selectedTag = t;
+            tagInput.value = t;
+            buildTagsRow();
+          });
+          tagsRow.appendChild(btn);
         });
-        tagsRow.appendChild(btn);
-      });
+      }
     }
 
     function openModal() {
       editingId = null;
       noteInput.value = '';
-      selectedTag = TAGS[0];
+      tagInput.value = '';
+      selectedTag = '';
       buildTagsRow();
       btnSave.disabled = true;
       modalTitle.textContent = 'New idea';
@@ -1033,6 +1067,7 @@
       editingId  = id;
       noteInput.value = note.rawText || note.text;
       selectedTag = note.tag;
+      tagInput.value = note.tag;
       buildTagsRow();
       btnSave.disabled = false;
       modalTitle.textContent = 'Edit idea';
@@ -1059,6 +1094,24 @@
       loadNotes();
       renderFeed();
       openModal();
+    });
+
+    // ── Tag input ──
+    tagInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const tag = tagInput.value.trim();
+        if (tag && tag !== selectedTag) {
+          selectedTag = tag;
+          addRecentTag(tag);
+          buildTagsRow();
+          tagInput.value = tag;
+        }
+      }
+    });
+
+    tagInput.addEventListener('input', e => {
+      selectedTag = e.target.value.trim();
     });
 
     // ── Textarea input: backlink detect ──
@@ -1143,37 +1196,43 @@
     // ── Save ──
     btnSave.addEventListener('click', () => {
       const raw  = noteInput.value.trim();
-      if (!raw) return;
+      const tag  = selectedTag || tagInput.value.trim();
+      if (!raw || !tag) return;
 
       const links = [];
       const re = /\[\[([^\]:]+):[^\]]*\]\]/g;
       let m;
       while ((m = re.exec(raw)) !== null) links.push(m[1]);
 
+      addRecentTag(tag);
+
       if (editingId) {
         const note = notes.find(n => n.id === editingId);
         if (note) {
           note.rawText = raw;
           note.text    = raw;
-          note.tag     = selectedTag;
+          note.tag     = tag;
           note.links   = links;
         }
         toast('Idea updated');
+        saveNotes();
+        closeModal();
+        renderFeed();
       } else {
         notes.unshift({
           id:        crypto.randomUUID(),
           text:      raw,
           rawText:   raw,
-          tag:       selectedTag,
+          tag:       tag,
           createdAt: Date.now(),
           links
         });
         toast('Idea saved! 24h to act on it.');
+        saveNotes();
+        renderFeed();
+        // Reabre el modal automáticamente
+        setTimeout(openModal, 400);
       }
-
-      saveNotes();
-      closeModal();
-      renderFeed();
     });
 
     // ══════════════════════════════════════════

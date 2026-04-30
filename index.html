@@ -1124,13 +1124,20 @@
 
     tagInput.addEventListener('input', e => {
       selectedTag = e.target.value.trim();
+      updateSaveButton();
     });
 
     // ── Textarea input: backlink detect ──
     noteInput.addEventListener('input', () => {
-      btnSave.disabled = noteInput.value.trim().length === 0;
+      updateSaveButton();
       detectBacklink();
     });
+
+    function updateSaveButton() {
+      const hasText = noteInput.value.trim().length > 0;
+      const hasTag = selectedTag || tagInput.value.trim();
+      btnSave.disabled = !(hasText && hasTag);
+    }
 
     noteInput.addEventListener('keydown', e => {
       if (!blSuggest.classList.contains('open')) return;
@@ -1208,31 +1215,41 @@
     // ── Save ──
     function extractLinks(text) {
       const links = [];
-      // Detectar formato completo [[id:title]] y simple [[title]]
-      const reComplete = /\[\[([^\]:]+):[^\]]*\]\]/g;
-      const reSimple = /\[\[([^\]:\[]+)\]\]/g;
-      
-      let m;
-      while ((m = reComplete.exec(text)) !== null) {
-        links.push(m[1]);
-      }
-      
-      // Buscar backlinks simples y tratar de encontrar el ID
       let cleanText = text;
-      const simpleMatches = [...text.matchAll(reSimple)];
-      simpleMatches.forEach(match => {
-        const searchText = match[1].trim();
+      
+      // Procesar todos los backlinks (ambos formatos)
+      cleanText = cleanText.replace(/\[\[([^\]]+)\]\]/g, (fullMatch, content) => {
+        const parts = content.split(':');
+        const idOrText = parts[0].trim();
+        const titleOrRest = parts.slice(1).join(':').trim();
+        
+        // Si ya tiene formato completo [[id:title]]
+        if (titleOrRest) {
+          // Verificar que el ID sea válido
+          const isValidId = notes.some(n => n.id === idOrText);
+          if (isValidId && !links.includes(idOrText)) {
+            links.push(idOrText);
+          }
+          return fullMatch;
+        }
+        
+        // Formato simple [[texto]] - buscar la nota
+        const searchText = idOrText.toLowerCase();
         const foundNote = notes.find(n => 
           n.id !== editingId && (
-            n.text.toLowerCase().includes(searchText.toLowerCase()) || 
-            n.tag.toLowerCase() === searchText.toLowerCase()
+            n.text.toLowerCase().includes(searchText) || 
+            n.tag.toLowerCase() === searchText
           )
         );
-        if (foundNote && !links.includes(foundNote.id)) {
-          links.push(foundNote.id);
-          // Reemplazar el formato simple con el completo
-          cleanText = cleanText.replace(`[[${searchText}]]`, `[[${foundNote.id}:${foundNote.text.slice(0, 40)}]]`);
+        
+        if (foundNote) {
+          if (!links.includes(foundNote.id)) {
+            links.push(foundNote.id);
+          }
+          return `[[${foundNote.id}:${foundNote.text.slice(0, 40)}]]`;
         }
+        
+        return fullMatch; // Devolver sin cambios si no encuentra
       });
       
       return { links, cleanText };

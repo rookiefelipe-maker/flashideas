@@ -398,9 +398,11 @@
       opacity: 0; pointer-events: none;
       transition: opacity 0.22s;
       display: flex;
-      align-items: center;
+      align-items: flex-end;        /* ancla abajo; el padding-bottom lo empuja */
       justify-content: center;
       padding: 1.25rem;
+      padding-bottom: 1.5rem;       /* base; se sobrescribe con JS cuando abre teclado */
+      transition: opacity 0.22s, padding-bottom 0.18s ease;
     }
     .overlay.open { opacity: 1; pointer-events: all; }
 
@@ -1584,6 +1586,54 @@
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
     }
+
+    // ══════════════════════════════════════════
+    //  KEYBOARD AVOIDANCE (Visual Viewport API)
+    // ══════════════════════════════════════════
+    (function () {
+      const vv = window.visualViewport;
+      if (!vv) return;
+
+      function onViewportChange() {
+        // Only act when modal-overlay (or preview-overlay) is open
+        const activeOverlay =
+          document.querySelector('.overlay.open');
+        if (!activeOverlay) return;
+
+        // Height of the visible area above the keyboard
+        const visibleHeight = vv.height;
+        // Total window height
+        const windowHeight  = window.innerHeight;
+        // Keyboard height = difference between full window and visible area
+        const kbHeight = Math.max(0, windowHeight - vv.offsetTop - visibleHeight);
+
+        // Push overlay content up by exactly the keyboard height + small gap
+        activeOverlay.style.paddingBottom = (kbHeight + 16) + 'px';
+        // On iOS the viewport also shifts; compensate top offset
+        activeOverlay.style.top  = vv.offsetTop + 'px';
+        activeOverlay.style.height = visibleHeight + 'px';
+      }
+
+      function resetOverlay() {
+        document.querySelectorAll('.overlay').forEach(el => {
+          el.style.paddingBottom = '';
+          el.style.top  = '';
+          el.style.height = '';
+        });
+      }
+
+      vv.addEventListener('resize', onViewportChange);
+      vv.addEventListener('scroll', onViewportChange);
+
+      // Also reset when modal closes
+      const origClose = window.closeModalKbHook;
+      document.addEventListener('click', e => {
+        // If a close action just happened, schedule a reset
+        if (e.target.closest('#btn-cancel, #btn-cancel-x, #preview-close')) {
+          setTimeout(resetOverlay, 350);
+        }
+      });
+    })();
 
     // ══════════════════════════════════════════
     //  SERVICE WORKER
